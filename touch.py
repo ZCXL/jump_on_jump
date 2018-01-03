@@ -32,10 +32,8 @@ def find_chesspiece(origin, compare):
     min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
     top_left = min_loc
     bottom_right = (top_left[0] + w, top_left[1] + h)
-    x = (top_left[0] + bottom_right[0]) / 2
-    y = bottom_right[1]
 
-    return x, y
+    return top_left, bottom_right
 def normalize_image(image):
     thresh = process_img(image)
     w, h = thresh.shape[::-1]
@@ -62,7 +60,7 @@ def normalize_image(image):
             else:
                 mat[i, j] = 0
     return mat
-def find_next_pos(image):
+def find_next_pos(image, chess_top_left, chess_bottom_right):
     mat = normalize_image(image)
     top_x = 0
     top_y = 0
@@ -77,21 +75,31 @@ def find_next_pos(image):
         if is_found:
             break
     ignore_cnt = 5
+    variable_cnt = 3
     bottom_y = 0
+    is_found = False
     for i in range(top_y + ignore_cnt, mat.shape[1]):
-        if mat[i][top_x] == 1:
-            bottom_y = i
+        for j in range(top_x - 3, top_x + 3):
+            if mat[i][j] == 1 and \
+                    (i > chess_bottom_right[1] or i < chess_top_left[1]) and \
+                    (j < chess_top_left[0] or j > chess_bottom_right[1]):
+                bottom_y = i
+                is_found = True
+                break
+        if is_found:
             break
     return (top_x * 8, (top_y + bottom_y) / 2 * 8)
 compare = cv2.imread('compare.png')
 origin = cv2.imread('current.png')
-chess_x, chess_y = find_chesspiece(origin, compare)
+top_left, bottom_right = find_chesspiece(origin, compare)
+chess_x = (top_left[0] + bottom_right[0]) / 2
+chess_y = bottom_right[1]
 print "chess position:(%d, %d)" % (chess_x, chess_y)
-grid_x, grid_y = find_next_pos(origin)
+grid_x, grid_y = find_next_pos(origin, top_left, bottom_right)
 print "grid position:(%d, %d)" % (grid_x, grid_y)
 distance = ((chess_x - grid_x)**2 + (chess_y - grid_y)**2)**0.5
 print "distance:%f" % distance
-time_span = distance / 1432
+time_span = distance / 1432 - 0.043
 print "time:%f" % time_span
 send_command('sh ./start_touch.sh')
 time.sleep(float(time_span))
